@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: vpn-dashboard
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://user:pass@db:5432/vpndb
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    volumes:
+      - openvpn_data:/etc/openvpn
+      - ./app/logs:/app/logs
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vpn-network
+
+  worker:
+    build: .
+    container_name: vpn-worker
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://user:pass@db:5432/vpndb
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - openvpn_data:/etc/openvpn
+      - ./app/logs:/app/logs
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    networks:
+      - vpn-network
+
+  openvpn:
+    build: ./openvpn-docker
+    container_name: openvpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    ports:
+      - "1194:1194/udp"
+    volumes:
+      - openvpn_data:/etc/openvpn
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "openvpn"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vpn-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vpn-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - vpn-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: vpn-db
+    environment:
+      - POSTGRES_DB=vpndb
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - vpn-network
+
+  # Optional: Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vpn-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - vpn-network
+
+volumes:
+  openvpn_data:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+
+networks:
+  vpn-network:
+    driver: bridge

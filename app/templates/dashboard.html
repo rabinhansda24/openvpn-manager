@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OpenVPN Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="dashboardData()">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-600">Monitor your OpenVPN server and client connections</p>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Clients -->
+        <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-users text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Clients</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="stats.clients?.total || 0"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-green-600 font-medium" x-text="stats.clients?.active || 0"></span>
+                    <span class="text-gray-500">active</span>
+                    <span class="text-red-600 font-medium ml-2" x-text="stats.clients?.revoked || 0"></span>
+                    <span class="text-gray-500">revoked</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Connected Clients -->
+        <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-wifi text-2xl text-green-600"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Connected Now</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="connectedClients.length"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm text-gray-500">
+                    Real-time connections
+                </div>
+            </div>
+        </div>
+        
+        <!-- Server Status -->
+        <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-server text-2xl" 
+                           :class="stats.openvpn?.running ? 'text-green-600' : 'text-red-600'"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Server Status</dt>
+                            <dd class="text-lg font-medium" 
+                                :class="stats.openvpn?.running ? 'text-green-600' : 'text-red-600'"
+                                x-text="stats.openvpn?.running ? 'Running' : 'Stopped'"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm text-gray-500" x-text="stats.system?.uptime_formatted || 'Unknown uptime'"></div>
+            </div>
+        </div>
+        
+        <!-- Expiring Certificates -->
+        <div class="bg-white overflow-hidden shadow rounded-lg hover-scale">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-certificate text-2xl text-yellow-600"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Expiring Soon</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="stats.clients?.expiring_soon || 0"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm text-gray-500">
+                    Next 30 days
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- System Metrics Chart -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">System Metrics</h3>
+            <div class="h-64">
+                <canvas id="systemMetricsChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Client Activity Chart -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Client Activity</h3>
+            <div class="h-64">
+                <canvas id="clientActivityChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Connected Clients -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Connected Clients</h3>
+                    
+                    <template x-if="connectedClients.length === 0">
+                        <div class="text-center py-8">
+                            <i class="fas fa-wifi text-4xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">No clients currently connected</p>
+                        </div>
+                    </template>
+                    
+                    <div class="space-y-4" x-show="connectedClients.length > 0">
+                        <template x-for="client in connectedClients" :key="client.name">
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-user-circle text-2xl text-green-600"></i>
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="text-sm font-medium text-gray-900" x-text="client.name"></p>
+                                            <p class="text-sm text-gray-500" x-text="client.virtual_address"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm text-gray-900" x-text="window.utils.formatBytes(client.bytes_sent + client.bytes_received)"></p>
+                                        <p class="text-sm text-gray-500" x-text="client.connection_duration"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions & Alerts -->
+        <div class="space-y-6">
+            <!-- Quick Actions -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
+                    <div class="space-y-3">
+                        <button @click="showAddClientModal = true" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition duration-150 ease-in-out">
+                            <i class="fas fa-plus mr-2"></i>
+                            Add New Client
+                        </button>
+                        <button @click="restartServer()" 
+                                class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md text-sm transition duration-150 ease-in-out">
+                            <i class="fas fa-redo mr-2"></i>
+                            Restart Server
+                        </button>
+                        <button @click="createBackup()" 
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md text-sm transition duration-150 ease-in-out">
+                            <i class="fas fa-download mr-2"></i>
+                            Create Backup
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Alerts -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">System Alerts</h3>
+                    
+                    <template x-if="alerts.length === 0">
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle text-2xl text-green-600 mb-2"></i>
+                            <p class="text-sm text-gray-500">All systems normal</p>
+                        </div>
+                    </template>
+                    
+                    <div class="space-y-3" x-show="alerts.length > 0">
+                        <template x-for="alert in alerts" :key="alert.category">
+                            <div class="border-l-4 p-4 rounded"
+                                 :class="alert.type === 'critical' ? 'border-red-400 bg-red-50' : 'border-yellow-400 bg-yellow-50'">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-sm"
+                                           :class="alert.type === 'critical' ? 'text-red-400' : 'text-yellow-400'"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium"
+                                           :class="alert.type === 'critical' ? 'text-red-800' : 'text-yellow-800'"
+                                           x-text="alert.message"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Recent Activity</h3>
+                    <div class="space-y-3">
+                        <template x-for="activity in recentActivity.slice(0, 5)" :key="activity.timestamp">
+                            <div class="flex items-center text-sm">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-circle text-xs text-blue-600"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-gray-900" x-text="activity.message"></p>
+                                    <p class="text-gray-500 text-xs" x-text="new Date(activity.timestamp).toLocaleString()"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Client Modal -->
+    <div x-show="showAddClientModal" 
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         x-cloak>
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form @submit.prevent="addClient()">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <i class="fas fa-plus text-blue-600"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900">Add New Client</h3>
+                                <div class="mt-4 space-y-4">
+                                    <div>
+                                        <label for="clientName" class="block text-sm font-medium text-gray-700">Client Name</label>
+                                        <input type="text" 
+                                               id="clientName" 
+                                               x-model="newClient.name"
+                                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                               required>
+                                    </div>
+                                    <div>
+                                        <label for="clientEmail" class="block text-sm font-medium text-gray-700">Email (Optional)</label>
+                                        <input type="email" 
+                                               id="clientEmail" 
+                                               x-model="newClient.email"
+                                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    </div>
+                                    <div>
+                                        <label for="clientDescription" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                                        <textarea id="clientDescription" 
+                                                  x-model="newClient.description"
+                                                  rows="3"
+                                                  class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" 
+                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            <i class="fas fa-plus mr-2"></i>
+                            Create Client
+                        </button>
+                        <button type="button" 
+                                @click="showAddClientModal = false"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function dashboardData() {
+    return {
+        stats: {},
+        connectedClients: [],
+        alerts: [],
+        recentActivity: [],
+        showAddClientModal: false,
+        newClient: {
+            name: '',
+            email: '',
+            description: ''
+        },
+        
+        init() {
+            this.loadDashboardData();
+            // Refresh data every 30 seconds
+            setInterval(() => {
+                this.loadDashboardData();
+            }, 30000);
+        },
+        
+        async loadDashboardData() {
+            try {
+                // Load dashboard stats
+                const statsResponse = await fetch('/api/dashboard/stats');
+                if (statsResponse.ok) {
+                    this.stats = await statsResponse.json();
+                }
+                
+                // Load connected clients
+                const clientsResponse = await fetch('/api/server/status');
+                if (clientsResponse.ok) {
+                    const serverData = await clientsResponse.json();
+                    this.connectedClients = serverData.connected_clients || [];
+                }
+                
+                // Load system alerts
+                const alertsResponse = await fetch('/system/alerts');
+                if (alertsResponse.ok) {
+                    const alertsData = await alertsResponse.json();
+                    this.alerts = alertsData.alerts || [];
+                }
+                
+                // Load recent activity
+                const activityResponse = await fetch('/api/dashboard/recent-activity');
+                if (activityResponse.ok) {
+                    const activityData = await activityResponse.json();
+                    this.recentActivity = [
+                        ...activityData.recent_clients.map(c => ({
+                            message: `Client "${c.name}" created`,
+                            timestamp: c.created_at
+                        })),
+                        ...activityData.recently_connected.map(c => ({
+                            message: `Client "${c.name}" connected`,
+                            timestamp: c.last_seen
+                        }))
+                    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                }
+                
+                this.updateCharts();
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        },
+        
+        updateCharts() {
+            // Update system metrics chart
+            this.updateSystemMetricsChart();
+            // Update client activity chart
+            this.updateClientActivityChart();
+        },
+        
+        updateSystemMetricsChart() {
+            const ctx = document.getElementById('systemMetricsChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['CPU', 'Memory', 'Disk'],
+                    datasets: [{
+                        data: [
+                            this.stats.system?.cpu_percent || 0,
+                            this.stats.system?.memory?.percent || 0,
+                            this.stats.system?.disk?.percent || 0
+                        ],
+                        backgroundColor: ['#3B82F6', '#10B981', '#F59E0B']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        },
+        
+        updateClientActivityChart() {
+            const ctx = document.getElementById('clientActivityChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Active', 'Revoked', 'Connected', 'Expiring'],
+                    datasets: [{
+                        label: 'Clients',
+                        data: [
+                            this.stats.clients?.active || 0,
+                            this.stats.clients?.revoked || 0,
+                            this.connectedClients.length,
+                            this.stats.clients?.expiring_soon || 0
+                        ],
+                        backgroundColor: ['#10B981', '#EF4444', '#3B82F6', '#F59E0B']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        },
+        
+        async addClient() {
+            try {
+                const response = await fetch('/api/clients', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.newClient)
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Client created successfully!', 'success');
+                    this.showAddClientModal = false;
+                    this.newClient = { name: '', email: '', description: '' };
+                    this.loadDashboardData();
+                } else {
+                    const error = await response.json();
+                    window.utils.showNotification(error.error || 'Failed to create client', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        },
+        
+        async restartServer() {
+            if (!confirm('Are you sure you want to restart the OpenVPN server? This will disconnect all clients temporarily.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/system/openvpn/restart', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Server restart initiated', 'success');
+                    setTimeout(() => this.loadDashboardData(), 5000);
+                } else {
+                    window.utils.showNotification('Failed to restart server', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        },
+        
+        async createBackup() {
+            try {
+                const response = await fetch('/system/backup/create', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Backup created successfully!', 'success');
+                } else {
+                    window.utils.showNotification('Failed to create backup', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

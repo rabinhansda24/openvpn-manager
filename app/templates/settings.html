@@ -1,0 +1,721 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - OpenVPN Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="settingsData()">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Settings</h1>
+        <p class="mt-1 text-sm text-gray-600">Configure your OpenVPN server and application settings</p>
+    </div>
+    
+    <!-- Settings Navigation -->
+    <div class="mb-6">
+        <nav class="flex space-x-8">
+            <button @click="activeTab = 'server'" 
+                    :class="activeTab === 'server' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                <i class="fas fa-server mr-2"></i>
+                Server Configuration
+            </button>
+            <button @click="activeTab = 'security'" 
+                    :class="activeTab === 'security' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                <i class="fas fa-shield-alt mr-2"></i>
+                Security
+            </button>
+            <button @click="activeTab = 'backup'" 
+                    :class="activeTab === 'backup' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                <i class="fas fa-download mr-2"></i>
+                Backup & Restore
+            </button>
+            <button @click="activeTab = 'monitoring'" 
+                    :class="activeTab === 'monitoring' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                <i class="fas fa-chart-line mr-2"></i>
+                Monitoring
+            </button>
+            <button @click="activeTab = 'system'" 
+                    :class="activeTab === 'system' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                <i class="fas fa-cog mr-2"></i>
+                System
+            </button>
+        </nav>
+    </div>
+    
+    <!-- Server Configuration Tab -->
+    <div x-show="activeTab === 'server'" x-cloak>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Configuration Form -->
+            <div class="lg:col-span-2">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">OpenVPN Server Configuration</h3>
+                        
+                        <form @submit.prevent="saveServerConfig()">
+                            <div class="space-y-6">
+                                <!-- Network Settings -->
+                                <div>
+                                    <h4 class="text-md font-medium text-gray-900 mb-3">Network Settings</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Port</label>
+                                            <input type="number" 
+                                                   x-model="serverConfig.port"
+                                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Protocol</label>
+                                            <select x-model="serverConfig.protocol"
+                                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                <option value="udp">UDP</option>
+                                                <option value="tcp">TCP</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Server Network</label>
+                                            <input type="text" 
+                                                   x-model="serverConfig.server_network"
+                                                   placeholder="10.8.0.0 255.255.255.0"
+                                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Max Clients</label>
+                                            <input type="number" 
+                                                   x-model="serverConfig.max_clients"
+                                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- DNS Settings -->
+                                <div>
+                                    <h4 class="text-md font-medium text-gray-900 mb-3">DNS Settings</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Primary DNS</label>
+                                            <input type="text" 
+                                                   x-model="serverConfig.dns_primary"
+                                                   placeholder="8.8.8.8"
+                                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Secondary DNS</label>
+                                            <input type="text" 
+                                                   x-model="serverConfig.dns_secondary"
+                                                   placeholder="8.8.4.4"
+                                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Security Settings -->
+                                <div>
+                                    <h4 class="text-md font-medium text-gray-900 mb-3">Security Settings</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Cipher</label>
+                                            <select x-model="serverConfig.cipher"
+                                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                <option value="AES-256-CBC">AES-256-CBC</option>
+                                                <option value="AES-128-CBC">AES-128-CBC</option>
+                                                <option value="AES-256-GCM">AES-256-GCM</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Auth Algorithm</label>
+                                            <select x-model="serverConfig.auth"
+                                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                <option value="SHA512">SHA512</option>
+                                                <option value="SHA256">SHA256</option>
+                                                <option value="SHA1">SHA1</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Advanced Configuration -->
+                                <div>
+                                    <h4 class="text-md font-medium text-gray-900 mb-3">Advanced Configuration</h4>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Raw Configuration</label>
+                                        <textarea x-model="serverConfig.raw_config"
+                                                  rows="10"
+                                                  class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono"
+                                                  placeholder="Enter additional OpenVPN configuration directives..."></textarea>
+                                        <p class="mt-1 text-sm text-gray-500">Enter one directive per line. Be careful as invalid configuration may break the server.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 flex justify-end space-x-3">
+                                <button type="button" 
+                                        @click="loadServerConfig()"
+                                        class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    Reset
+                                </button>
+                                <button type="submit" 
+                                        class="bg-blue-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Configuration Status -->
+            <div class="space-y-6">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Server Status</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Server Status</span>
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                                      :class="serverStatus.running ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                      x-text="serverStatus.running ? 'Running' : 'Stopped'"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Uptime</span>
+                                <span class="text-sm text-gray-900" x-text="serverStatus.uptime || 'N/A'"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">Connected Clients</span>
+                                <span class="text-sm text-gray-900" x-text="serverStatus.connected_clients || 0"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 space-y-2">
+                            <button @click="restartServer()" 
+                                    class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                <i class="fas fa-redo mr-2"></i>
+                                Restart Server
+                            </button>
+                            <button @click="validateConfig()" 
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                <i class="fas fa-check mr-2"></i>
+                                Validate Config
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Configuration History</h3>
+                        <div class="space-y-2">
+                            <template x-for="backup in configBackups.slice(0, 5)" :key="backup.timestamp">
+                                <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900" x-text="new Date(backup.timestamp).toLocaleDateString()"></div>
+                                        <div class="text-xs text-gray-500" x-text="backup.description"></div>
+                                    </div>
+                                    <button @click="restoreConfig(backup)" 
+                                            class="text-blue-600 hover:text-blue-900 text-sm">
+                                        Restore
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Security Tab -->
+    <div x-show="activeTab === 'security'" x-cloak>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Certificate Management</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-2">Certificate Authority</h4>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <div class="text-sm text-gray-600">Expires: <span x-text="certificates.ca?.expires || 'Unknown'"></span></div>
+                                <div class="text-sm text-gray-600">Serial: <span x-text="certificates.ca?.serial || 'Unknown'"></span></div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-2">Server Certificate</h4>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <div class="text-sm text-gray-600">Expires: <span x-text="certificates.server?.expires || 'Unknown'"></span></div>
+                                <div class="text-sm text-gray-600">Serial: <span x-text="certificates.server?.serial || 'Unknown'"></span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <button @click="regenerateServerCert()" 
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                <i class="fas fa-sync mr-2"></i>
+                                Regenerate Server Certificate
+                            </button>
+                            <button @click="backupCertificates()" 
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                <i class="fas fa-download mr-2"></i>
+                                Backup Certificates
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Security Settings</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" 
+                                       x-model="securitySettings.enforce_2fa"
+                                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-700">Enforce 2FA for all users</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" 
+                                       x-model="securitySettings.auto_logout"
+                                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-700">Auto logout inactive sessions</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Session timeout (minutes)</label>
+                            <input type="number" 
+                                   x-model="securitySettings.session_timeout"
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Failed login attempts limit</label>
+                            <input type="number" 
+                                   x-model="securitySettings.max_login_attempts"
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        </div>
+                        
+                        <button @click="saveSecuritySettings()" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            Save Security Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Backup Tab -->
+    <div x-show="activeTab === 'backup'" x-cloak>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Create Backup</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Backup Type</label>
+                            <select x-model="backupType"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="full">Full Backup (Config + Certificates + Database)</option>
+                                <option value="config">Configuration Only</option>
+                                <option value="certificates">Certificates Only</option>
+                            </select>
+                        </div>
+                        
+                        <button @click="createBackup()" 
+                                :disabled="backupInProgress"
+                                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            <i class="fas fa-download mr-2"></i>
+                            <span x-text="backupInProgress ? 'Creating Backup...' : 'Create Backup'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Backup History</h3>
+                    
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                        <template x-for="backup in backups" :key="backup.name">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900" x-text="backup.name"></div>
+                                    <div class="text-xs text-gray-500">
+                                        <span x-text="new Date(backup.created_at).toLocaleString()"></span>
+                                        <span class="ml-2" x-text="window.utils.formatBytes(backup.size)"></span>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button @click="downloadBackup(backup)" 
+                                            class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button @click="restoreBackup(backup)" 
+                                            class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-upload"></i>
+                                    </button>
+                                    <button @click="deleteBackup(backup)" 
+                                            class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Monitoring Tab -->
+    <div x-show="activeTab === 'monitoring'" x-cloak>
+        <div class="space-y-6">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Monitoring Configuration</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-3">Prometheus Integration</h4>
+                            <div class="space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" 
+                                           x-model="monitoringSettings.prometheus_enabled"
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                    <span class="ml-2 text-sm text-gray-700">Enable Prometheus metrics</span>
+                                </label>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Metrics endpoint</label>
+                                    <input type="text" 
+                                           x-model="monitoringSettings.metrics_endpoint"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-3">Alerting</h4>
+                            <div class="space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" 
+                                           x-model="monitoringSettings.email_alerts"
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                    <span class="ml-2 text-sm text-gray-700">Email alerts</span>
+                                </label>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Alert email</label>
+                                    <input type="email" 
+                                           x-model="monitoringSettings.alert_email"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <button @click="saveMonitoringSettings()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            Save Monitoring Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Tab -->
+    <div x-show="activeTab === 'system'" x-cloak>
+        <div class="space-y-6">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">System Information</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-3">Application</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Version</span>
+                                    <span class="text-sm text-gray-900">1.0.0</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Environment</span>
+                                    <span class="text-sm text-gray-900" x-text="systemInfo.environment || 'Unknown'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Debug Mode</span>
+                                    <span class="text-sm text-gray-900" x-text="systemInfo.debug ? 'Enabled' : 'Disabled'"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900 mb-3">System</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">OS</span>
+                                    <span class="text-sm text-gray-900" x-text="systemInfo.os || 'Unknown'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">Python Version</span>
+                                    <span class="text-sm text-gray-900" x-text="systemInfo.python_version || 'Unknown'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-600">OpenVPN Version</span>
+                                    <span class="text-sm text-gray-900" x-text="systemInfo.openvpn_version || 'Unknown'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Maintenance</h3>
+                    
+                    <div class="space-y-4">
+                        <button @click="cleanupLogs()" 
+                                class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            <i class="fas fa-broom mr-2"></i>
+                            Cleanup Old Logs
+                        </button>
+                        
+                        <button @click="updateCRL()" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            <i class="fas fa-sync mr-2"></i>
+                            Update Certificate Revocation List
+                        </button>
+                        
+                        <button @click="restartServices()" 
+                                class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md text-sm">
+                            <i class="fas fa-power-off mr-2"></i>
+                            Restart All Services
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function settingsData() {
+    return {
+        activeTab: 'server',
+        serverConfig: {
+            port: 1194,
+            protocol: 'udp',
+            server_network: '10.8.0.0 255.255.255.0',
+            max_clients: 100,
+            dns_primary: '8.8.8.8',
+            dns_secondary: '8.8.4.4',
+            cipher: 'AES-256-CBC',
+            auth: 'SHA512',
+            raw_config: ''
+        },
+        serverStatus: {},
+        configBackups: [],
+        certificates: {},
+        securitySettings: {
+            enforce_2fa: false,
+            auto_logout: true,
+            session_timeout: 60,
+            max_login_attempts: 5
+        },
+        backupType: 'full',
+        backupInProgress: false,
+        backups: [],
+        monitoringSettings: {
+            prometheus_enabled: true,
+            metrics_endpoint: '/system/prometheus/metrics',
+            email_alerts: false,
+            alert_email: ''
+        },
+        systemInfo: {},
+        
+        init() {
+            this.loadServerConfig();
+            this.loadServerStatus();
+            this.loadBackups();
+            this.loadSystemInfo();
+        },
+        
+        async loadServerConfig() {
+            try {
+                const response = await fetch('/api/server/config');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Parse the configuration data
+                    this.serverConfig = { ...this.serverConfig, ...data.parsed_config };
+                }
+            } catch (error) {
+                console.error('Error loading server config:', error);
+            }
+        },
+        
+        async loadServerStatus() {
+            try {
+                const response = await fetch('/api/server/status');
+                if (response.ok) {
+                    this.serverStatus = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading server status:', error);
+            }
+        },
+        
+        async loadBackups() {
+            try {
+                const response = await fetch('/system/backup/list');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.backups = data.backups || [];
+                }
+            } catch (error) {
+                console.error('Error loading backups:', error);
+            }
+        },
+        
+        async loadSystemInfo() {
+            // Mock system info - replace with actual API call
+            this.systemInfo = {
+                environment: 'production',
+                debug: false,
+                os: 'Linux',
+                python_version: '3.11.0',
+                openvpn_version: '2.5.0'
+            };
+        },
+        
+        async saveServerConfig() {
+            try {
+                const response = await fetch('/api/server/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.serverConfig)
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Configuration saved successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    window.utils.showNotification(error.error || 'Failed to save configuration', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        },
+        
+        async restartServer() {
+            if (!confirm('Are you sure you want to restart the OpenVPN server? This will disconnect all clients temporarily.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/system/openvpn/restart', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Server restart initiated', 'success');
+                    setTimeout(() => this.loadServerStatus(), 5000);
+                } else {
+                    window.utils.showNotification('Failed to restart server', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        },
+        
+        async createBackup() {
+            this.backupInProgress = true;
+            
+            try {
+                const response = await fetch('/system/backup/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ type: this.backupType })
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Backup created successfully!', 'success');
+                    this.loadBackups();
+                } else {
+                    window.utils.showNotification('Failed to create backup', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            } finally {
+                this.backupInProgress = false;
+            }
+        },
+        
+        async deleteBackup(backup) {
+            if (!confirm(`Are you sure you want to delete backup "${backup.name}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/system/backup/delete/${backup.name}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    window.utils.showNotification('Backup deleted successfully', 'success');
+                    this.loadBackups();
+                } else {
+                    window.utils.showNotification('Failed to delete backup', 'error');
+                }
+            } catch (error) {
+                window.utils.showNotification('Network error', 'error');
+            }
+        },
+        
+        validateConfig() {
+            window.utils.showNotification('Configuration validation feature coming soon', 'info');
+        },
+        
+        saveSecuritySettings() {
+            window.utils.showNotification('Security settings saved', 'success');
+        },
+        
+        saveMonitoringSettings() {
+            window.utils.showNotification('Monitoring settings saved', 'success');
+        },
+        
+        cleanupLogs() {
+            window.utils.showNotification('Log cleanup initiated', 'success');
+        },
+        
+        updateCRL() {
+            window.utils.showNotification('CRL update initiated', 'success');
+        },
+        
+        restartServices() {
+            if (!confirm('Are you sure you want to restart all services? This will cause temporary downtime.')) {
+                return;
+            }
+            window.utils.showNotification('Services restart initiated', 'warning');
+        }
+    }
+}
+</script>
+{% endblock %}

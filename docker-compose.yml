@@ -32,7 +32,7 @@ services:
   worker:
     build: .
     container_name: vpn-worker
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A app worker --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://user:pass@db:5432/vpndb
@@ -64,6 +64,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    sysctls:
+      net.ipv4.ip_forward: 1
+    privileged: true
     networks:
       - vpn-network
 

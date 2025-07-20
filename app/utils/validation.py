@@ -197,11 +197,18 @@ def require_admin(f):
     return decorated_function
 
 def require_auth(f):
-    """Decorator to require authentication."""
+    """Decorator to require authentication with proper redirect handling."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
+            # Check if this is an API request (JSON content type or /api/ path)
+            if (request.content_type and 'application/json' in request.content_type) or \
+               request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required'}), 401
+            else:
+                # For web requests, let Flask-Login handle the redirect
+                from flask_login import login_required
+                return login_required(f)(*args, **kwargs)
         
         return f(*args, **kwargs)
     return decorated_function

@@ -7,7 +7,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=production
+      - FLASK_ENV=development
       - ADMIN_USER=${ADMIN_USER}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - REDIS_URL=redis://redis:6379/0
@@ -32,11 +32,39 @@ services:
   worker:
     build: .
     container_name: vpn-worker
-    command: celery -A app worker --loglevel=info
+    working_dir: /app
+    command: celery -A celery_app worker --loglevel=info
     environment:
+      - FLASK_ENV=development
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATABASE_URL=postgresql://user:pass@db:5432/vpndb
       - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    volumes:
+      - openvpn_data:/etc/openvpn
+      - ./app/logs:/app/logs
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    networks:
+      - vpn-network
+
+  beat:
+    build: .
+    container_name: vpn-beat
+    working_dir: /app
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      - FLASK_ENV=development
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=postgresql://user:pass@db:5432/vpndb
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     volumes:
       - openvpn_data:/etc/openvpn
       - ./app/logs:/app/logs

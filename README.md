@@ -137,7 +137,7 @@ flask init-db
 flask create-admin
 
 # Start development server
-python app.py
+python run.py
 ```
 
 ### 2. Using UV Package Manager
@@ -154,7 +154,7 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 
 # Run development server
-uv run python app.py
+uv run python run.py
 ```
 
 ### 3. Start Background Services

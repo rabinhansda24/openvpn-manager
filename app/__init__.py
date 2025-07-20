@@ -3,14 +3,13 @@ OpenVPN Server Management Application
 Enhanced Flask application with security, monitoring, and modern features.
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from celery import Celery
 import redis
 import os
 from datetime import timedelta
@@ -21,24 +20,6 @@ migrate = Migrate()
 login_manager = LoginManager()
 jwt = JWTManager()
 socketio = SocketIO()
-
-def make_celery(app):
-    """Create Celery instance with Flask app context."""
-    celery = Celery(
-        app.import_name,
-        backend=app.config['CELERY_RESULT_BACKEND'],
-        broker=app.config['CELERY_BROKER_URL']
-    )
-    celery.conf.update(app.config)
-
-    class ContextTask(celery.Task):
-        """Make celery tasks work with Flask app context."""
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
-
-    celery.Task = ContextTask
-    return celery
 
 def create_app(config_name='default'):
     """Application factory pattern."""
@@ -56,13 +37,12 @@ def create_app(config_name='default'):
     socketio.init_app(app, cors_allowed_origins="*")
     
     # Configure login manager
-    login_manager.login_view = 'auth.login'
+    login_manager.login_view = 'auth.login_page'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
-    
-    # Create Celery instance
-    celery = make_celery(app)
-    app.celery = celery
+    login_manager.needs_refresh_message = 'Please log in again to access this page.'
+    login_manager.needs_refresh_message_category = 'info'
+    login_manager.session_protection = "strong"
     
     # Register blueprints
     from app.routes.auth import auth_bp
@@ -82,6 +62,31 @@ def create_app(config_name='default'):
     
     # Register CLI commands
     register_cli_commands(app)
+    
+    # Add global before request handler
+    @app.before_request
+    def before_request():
+        """Global before request handler."""
+        from flask_login import current_user, logout_user
+        from app.utils.security import session_timeout_check
+        
+        # Skip static files and auth routes
+        if request.endpoint and (request.endpoint.startswith('static') or 
+                               request.endpoint.startswith('auth.')):
+            return
+        
+        # Check session timeout
+        if current_user.is_authenticated and not session_timeout_check():
+            logout_user()
+            session.clear()
+            
+            # For API requests, return JSON error
+            if (request.content_type and 'application/json' in request.content_type) or \
+               request.path.startswith('/api/'):
+                return jsonify({'error': 'Session expired', 'redirect': url_for('auth.login_page')}), 401
+            
+            # For web requests, redirect to login
+            return redirect(url_for('auth.login_page', next=request.url))
     
     # Health check endpoint
     @app.route('/health')
@@ -107,12 +112,32 @@ def create_app(config_name='default'):
                 'error': str(e)
             }), 503
     
+    # Ensure session configuration is suitable for Docker
+    app.config['SESSION_TYPE'] = 'redis'
+    app.config['SESSION_PERMANENT'] = True
+    app.config['SESSION_USE_SIGNER'] = True
+    app.config['SESSION_REDIS'] = redis.from_url(app.config['REDIS_URL'])
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+    
+    # Ensure secret key is set
+    if not app.config.get('SECRET_KEY'):
+        app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key')
+    
     return app
 
 def get_config(config_name):
     """Get configuration class based on environment."""
     from app.config import config
-    return config.get(config_name, config['default'])
+    config_class = config.get(config_name, config['default'])
+    
+    # Validate production config only when it's being used
+    if config_name == 'production' and config_class.__name__ == 'ProductionConfig':
+        if not config_class.SECRET_KEY:
+            raise ValueError("No SECRET_KEY set for production environment")
+        if not config_class.JWT_SECRET_KEY:
+            raise ValueError("No JWT_SECRET_KEY set for production environment")
+    
+    return config_class
 
 def register_error_handlers(app):
     """Register application error handlers."""

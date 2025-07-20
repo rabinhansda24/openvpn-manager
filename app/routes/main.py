@@ -2,7 +2,7 @@
 Main routes for the OpenVPN management application.
 """
 
-from flask import Blueprint, render_template, jsonify, current_app
+from flask import Blueprint, render_template, jsonify, current_app, redirect, url_for, request, session
 from flask_login import login_required, current_user
 from app.utils import require_auth, audit_log
 from app.models.client import VPNClient
@@ -16,8 +16,21 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
-    """Main dashboard view."""
-    return render_template('dashboard.html')
+    """Main entry point - redirect to dashboard if authenticated, login if not."""
+    try:
+        # Add explicit check to handle potential proxy issues
+        if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
+            current_app.logger.debug("User is authenticated, redirecting to dashboard")
+            return redirect(url_for('main.dashboard'))
+        else:
+            current_app.logger.debug("User is not authenticated, redirecting to login")
+            # Pass the next parameter to login page for redirect after login
+            next_url = request.args.get('next', url_for('main.dashboard'))
+            return redirect(url_for('auth.login_page', next=next_url))
+    except Exception as e:
+        current_app.logger.error(f"Error in index route: {str(e)}")
+        # Default to login page if there's any error
+        return redirect(url_for('auth.login_page'))
 
 @main_bp.route('/dashboard')
 @login_required
@@ -228,6 +241,18 @@ def check_memory_usage():
         return memory.percent < 90  # Consider healthy if less than 90% used
     except Exception:
         return False
+
+@main_bp.route('/debug-auth')
+def debug_auth():
+    """Debug endpoint to check authentication state."""
+    auth_status = {
+        'is_authenticated': getattr(current_user, 'is_authenticated', False),
+        'user_id': getattr(current_user, 'id', None),
+        'username': getattr(current_user, 'username', None),
+        'session_keys': list(session.keys()) if session else [],
+        'request_cookies': {k: v for k, v in request.cookies.items()}
+    }
+    return jsonify(auth_status)
 
 @main_bp.errorhandler(404)
 def not_found(error):

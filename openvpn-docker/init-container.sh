@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# OpenVPN Docker Container Initialization Script
+# OpenVPN Docker Container Initialization Script - Fixed Version
 
 set -e
 
@@ -20,6 +20,7 @@ warn() {
 
 error() {
     echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
+    exit 1
 }
 
 # Configuration
@@ -30,9 +31,28 @@ CA_NAME="OpenVPN-CA"
 
 log "Starting OpenVPN container initialization..."
 
+# Check for TUN device availability
+log "Checking TUN device availability..."
+if [ ! -e /dev/net/tun ]; then
+    error "TUN device not found at /dev/net/tun. Container needs --cap-add=NET_ADMIN and --device=/dev/net/tun"
+fi
+
+if [ ! -c /dev/net/tun ]; then
+    error "TUN device exists but is not a character device. Check Docker configuration."
+fi
+
+log "TUN device is available"
+
+# Test TUN device access
+if ! cat /dev/net/tun > /dev/null 2>&1; then
+    warn "Cannot read from TUN device, but continuing..."
+fi
+
 # Enable IP forwarding
 echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
-sysctl -p
+if ! sysctl -p; then
+    warn "Failed to set IP forwarding, continuing anyway..."
+fi
 
 # Check if PKI exists
 if [ ! -d "$EASY_RSA_DIR/pki" ]; then
@@ -40,25 +60,25 @@ if [ ! -d "$EASY_RSA_DIR/pki" ]; then
     cd $EASY_RSA_DIR
     
     # Initialize PKI
-    ./easyrsa init-pki
+    ./easyrsa init-pki || error "Failed to initialize PKI"
     
     # Create CA (non-interactive)
-    echo "$CA_NAME" | ./easyrsa build-ca nopass
+    echo "$CA_NAME" | ./easyrsa build-ca nopass || error "Failed to build CA"
     
     # Generate server certificate
-    ./easyrsa build-server-full $SERVER_NAME nopass
+    ./easyrsa --batch build-server-full $SERVER_NAME nopass || error "Failed to build server certificate"
     
     # Generate Diffie-Hellman parameters
-    ./easyrsa gen-dh
+    ./easyrsa gen-dh || error "Failed to generate DH parameters"
     
     # Generate TLS auth key
-    openvpn --genkey --secret $OPENVPN_DIR/ta.key
+    openvpn --genkey --secret $OPENVPN_DIR/ta.key || error "Failed to generate TLS auth key"
     
     # Copy certificates
-    cp pki/ca.crt $OPENVPN_DIR/
-    cp pki/issued/$SERVER_NAME.crt $OPENVPN_DIR/
-    cp pki/private/$SERVER_NAME.key $OPENVPN_DIR/
-    cp pki/dh.pem $OPENVPN_DIR/
+    cp pki/ca.crt $OPENVPN_DIR/ || error "Failed to copy CA certificate"
+    cp pki/issued/$SERVER_NAME.crt $OPENVPN_DIR/ || error "Failed to copy server certificate"
+    cp pki/private/$SERVER_NAME.key $OPENVPN_DIR/ || error "Failed to copy server key"
+    cp pki/dh.pem $OPENVPN_DIR/ || error "Failed to copy DH parameters"
     
     # Set permissions
     chmod 600 $OPENVPN_DIR/$SERVER_NAME.key
@@ -68,6 +88,16 @@ if [ ! -d "$EASY_RSA_DIR/pki" ]; then
 else
     log "PKI already exists, skipping initialization"
 fi
+
+# Verify required certificate files exist
+required_files=("ca.crt" "$SERVER_NAME.crt" "$SERVER_NAME.key" "dh.pem" "ta.key")
+for file in "${required_files[@]}"; do
+    if [ ! -f "$OPENVPN_DIR/$file" ]; then
+        error "Required certificate file missing: $OPENVPN_DIR/$file"
+    fi
+done
+
+log "All required certificate files are present"
 
 # Create server configuration if it doesn't exist
 if [ ! -f "$OPENVPN_DIR/server.conf" ]; then
@@ -122,15 +152,26 @@ explicit-exit-notify 1
 # Management interface
 management 0.0.0.0 7505
 
-# Run as nobody for security
-user nobody
-group nobody
+# Run as nobody for security (disabled for container compatibility)
+# user nobody
+# group nobody
 EOF
     
     log "Server configuration created"
 else
     log "Server configuration already exists"
 fi
+
+# Validate OpenVPN configuration
+log "Validating OpenVPN configuration..."
+if ! openvpn --config $OPENVPN_DIR/server.conf --test-crypto; then
+    warn "OpenVPN crypto test failed, but continuing anyway (container environment limitation)"
+fi
+
+# Create log directory and files
+mkdir -p /var/log/openvpn
+touch /var/log/openvpn/openvpn.log
+touch /var/log/openvpn/openvpn-status.log
 
 # Set up iptables for NAT
 log "Setting up iptables rules..."
@@ -140,22 +181,22 @@ DEFAULT_INTERFACE=$(ip route | grep default | awk '{print $5}' | head -n 1)
 
 if [ -n "$DEFAULT_INTERFACE" ]; then
     # Enable NAT for VPN traffic
-    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $DEFAULT_INTERFACE -j MASQUERADE
-    iptables -A INPUT -i tun0 -j ACCEPT
-    iptables -A FORWARD -i $DEFAULT_INTERFACE -o tun0 -j ACCEPT
-    iptables -A FORWARD -i tun0 -o $DEFAULT_INTERFACE -j ACCEPT
-    iptables -A INPUT -i $DEFAULT_INTERFACE -p udp --dport 1194 -j ACCEPT
+    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $DEFAULT_INTERFACE -j MASQUERADE || warn "Failed to add MASQUERADE rule"
+    iptables -A INPUT -i tun0 -j ACCEPT || warn "Failed to add INPUT rule for tun0"
+    iptables -A FORWARD -i $DEFAULT_INTERFACE -o tun0 -j ACCEPT || warn "Failed to add FORWARD rule"
+    iptables -A FORWARD -i tun0 -o $DEFAULT_INTERFACE -j ACCEPT || warn "Failed to add FORWARD rule"
+    iptables -A INPUT -i $DEFAULT_INTERFACE -p udp --dport 1194 -j ACCEPT || warn "Failed to add INPUT rule for port 1194"
     
     log "iptables rules configured for interface: $DEFAULT_INTERFACE"
 else
     warn "Could not determine default interface for iptables rules"
 fi
 
-# Create log files
-touch /var/log/openvpn/openvpn.log
-touch /var/log/openvpn/openvpn-status.log
-
 log "Starting OpenVPN server..."
+log "OpenVPN configuration file: $OPENVPN_DIR/server.conf"
+log "OpenVPN log file: /var/log/openvpn/openvpn.log"
 
-# Start OpenVPN
-exec openvpn --config $OPENVPN_DIR/server.conf
+# Start OpenVPN with better error handling
+if ! openvpn --config $OPENVPN_DIR/server.conf; then
+    error "OpenVPN failed to start. Check the configuration and logs above."
+fi

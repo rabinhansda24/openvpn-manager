@@ -2,7 +2,7 @@
 Authentication routes for the OpenVPN management application.
 """
 
-from flask import Blueprint, request, jsonify, session, current_app
+from flask import Blueprint, request, jsonify, session, current_app, render_template, redirect, url_for
 from flask_login import login_user, logout_user, current_user
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from app.models.user import User
@@ -18,9 +18,31 @@ import pyotp
 
 auth_bp = Blueprint('auth', __name__)
 
+def is_safe_url(target):
+    """Check if URL is safe for redirect."""
+    from urllib.parse import urlparse, urljoin
+    
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+@auth_bp.route('/login', methods=['GET'])
+def login_page():
+    """Display login page."""
+    # If user is already logged in, redirect to dashboard or next page
+    if current_user.is_authenticated:
+        next_page = request.args.get('next')
+        if next_page and is_safe_url(next_page):
+            return redirect(next_page)
+        return redirect(url_for('main.dashboard'))
+    
+    # Get the next parameter for redirect after login
+    next_url = request.args.get('next', url_for('main.dashboard'))
+    return render_template('login.html', next=next_url)
+
 @auth_bp.route('/login', methods=['POST'])
 @rate_limit('10/minute')
-@validate_json_input(required_fields=['username', 'password'])
+@validate_json_input(required_fields=['username', 'password'], optional_fields=['totp_token', 'remember_me', 'next'])
 def login():
     """User login endpoint."""
     data = sanitize_input(request.get_json())
@@ -28,6 +50,7 @@ def login():
     password = data.get('password')
     totp_token = data.get('totp_token')
     remember_me = data.get('remember_me', False)
+    next_url = data.get('next', url_for('main.dashboard'))
     
     # Find user
     user = User.query.filter_by(username=username).first()
@@ -82,9 +105,16 @@ def login():
     
     audit_log('login_success', {'username': username})
     
+    # Validate and sanitize next URL
+    if next_url and is_safe_url(next_url):
+        redirect_url = next_url
+    else:
+        redirect_url = url_for('main.dashboard')
+    
     response_data = {
         'message': 'Login successful',
         'access_token': access_token,
+        'redirect_url': redirect_url,
         'user': {
             'id': user.id,
             'username': user.username,
@@ -97,7 +127,7 @@ def login():
     
     return jsonify(response_data), 200
 
-@auth_bp.route('/logout', methods=['POST'])
+@auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
     """User logout endpoint."""
     if current_user.is_authenticated:
@@ -107,7 +137,12 @@ def logout():
     logout_user()
     session.clear()
     
-    return jsonify({'message': 'Logout successful'}), 200
+    if request.method == 'GET':
+        # Redirect to login page for GET requests
+        return redirect(url_for('auth.login_page'))
+    else:
+        # JSON response for POST requests
+        return jsonify({'message': 'Logout successful'}), 200
 
 @auth_bp.route('/2fa/setup', methods=['POST'])
 @jwt_required()

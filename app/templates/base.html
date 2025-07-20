@@ -107,12 +107,10 @@
                                     <i class="fas fa-key mr-2"></i>
                                     Change Password
                                 </a>
-                                <form method="POST" action="{{ url_for('auth.logout') }}" class="block">
-                                    <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        <i class="fas fa-sign-out-alt mr-2"></i>
-                                        Logout
-                                    </button>
-                                </form>
+                                <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>
+                                    Logout
+                                </a>
                             </div>
                         </div>
                     </div>

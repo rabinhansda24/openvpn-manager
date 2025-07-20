@@ -2,7 +2,6 @@
 Background tasks for the OpenVPN management application using Celery.
 """
 
-from celery import Celery
 from flask import current_app
 from app.services.backup_service import BackupService
 from app.services.monitoring_service import MonitoringService
@@ -12,59 +11,27 @@ from app.models.user import User
 from app import db
 from datetime import datetime, timedelta
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-def make_celery(app):
-    """Create Celery instance with Flask app context."""
-    celery = Celery(
-        app.import_name,
-        backend=app.config['CELERY_RESULT_BACKEND'],
-        broker=app.config['CELERY_BROKER_URL']
-    )
-    celery.conf.update(app.config)
+# Get celery instance from the celery_app module
+def get_celery():
+    """Get the celery instance."""
+    try:
+        from celery_app import celery
+        return celery
+    except ImportError:
+        # Fallback for testing or when celery_app is not available
+        from celery import Celery
+        return Celery('fallback')
 
-    class ContextTask(celery.Task):
-        """Make celery tasks work with Flask app context."""
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
-
-    celery.Task = ContextTask
-    return celery
-
-# Tasks will be registered when this module is imported by the Flask app
-celery = None
+# Initialize celery instance
+celery = get_celery()
 
 def init_celery(app):
-    """Initialize Celery with Flask app."""
+    """Initialize Celery with Flask app - for compatibility."""
     global celery
-    celery = make_celery(app)
-    
-    # Register periodic tasks
-    celery.conf.beat_schedule = {
-        'daily-backup': {
-            'task': 'app.tasks.background_tasks.create_daily_backup',
-            'schedule': 86400.0,  # 24 hours
-        },
-        'check-certificate-expiry': {
-            'task': 'app.tasks.background_tasks.check_certificate_expiry',
-            'schedule': 3600.0,  # 1 hour
-        },
-        'cleanup-logs': {
-            'task': 'app.tasks.background_tasks.cleanup_old_logs',
-            'schedule': 86400.0,  # 24 hours
-        },
-        'system-health-check': {
-            'task': 'app.tasks.background_tasks.system_health_check',
-            'schedule': 300.0,  # 5 minutes
-        },
-        'update-client-usage': {
-            'task': 'app.tasks.background_tasks.update_client_usage_stats',
-            'schedule': 900.0,  # 15 minutes
-        },
-    }
-    
+    celery = get_celery()
     return celery
 
 @celery.task(bind=True)
@@ -391,12 +358,12 @@ def send_email_notification(recipients, subject, body):
         if not all([smtp_server, smtp_username, smtp_password]):
             return {'status': 'error', 'error': 'Email configuration incomplete'}
         
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = smtp_username
         msg['To'] = ', '.join(recipients)
         msg['Subject'] = subject
         
-        msg.attach(MimeText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain'))
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         if use_tls:

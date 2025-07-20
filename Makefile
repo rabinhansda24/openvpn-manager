@@ -88,16 +88,16 @@ endif
 
 # Running the application
 run:
-	$(PYTHON) app.py
+	$(PYTHON) run.py
 
 run-dev:
-	FLASK_ENV=development FLASK_DEBUG=True $(PYTHON) app.py
+	FLASK_ENV=development FLASK_DEBUG=True $(PYTHON) run.py
 
 run-worker:
-	celery -A app.celery worker --loglevel=info
+	celery -A celery_app worker --loglevel=info
 
 run-beat:
-	celery -A app.celery beat --loglevel=info
+	celery -A celery_app beat --loglevel=info
 
 # Database operations
 init-db:

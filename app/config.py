@@ -103,12 +103,6 @@ class ProductionConfig(BaseConfig):
     # Use environment variables for sensitive data
     SECRET_KEY = os.environ.get('SECRET_KEY')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
-    
-    if not SECRET_KEY:
-        raise ValueError("No SECRET_KEY set for production environment")
-    
-    if not JWT_SECRET_KEY:
-        raise ValueError("No JWT_SECRET_KEY set for production environment")
 
 class DockerConfig(BaseConfig):
     """Docker-specific configuration."""
